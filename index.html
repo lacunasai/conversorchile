@@ -51,10 +51,9 @@
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <span class="text-gray-500 sm:text-sm">CLP$</span>
                         </div>
-                        <!-- CAMBIO: Aumentado padding izquierdo de pl-12 a pl-14 -->
                         <input type="number" id="usd-to-clp-rate"
                                class="w-full pl-14 pr-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xl"
-                               placeholder="Ej: 930"
+                               placeholder="Cargando..."
                                inputmode="decimal">
                     </div>
                 </div>
@@ -67,13 +66,14 @@
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <span class="text-gray-500 sm:text-sm">ARS$</span>
                         </div>
-                        <!-- CAMBIO: Aumentado padding izquierdo de pl-12 a pl-14 -->
                         <input type="number" id="usd-to-ars-rate"
                                class="w-full pl-14 pr-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xl"
-                               placeholder="Ej: 1100"
+                               placeholder="Cargando..."
                                inputmode="decimal">
                     </div>
                 </div>
+                <!-- CAMBIO: Añadido estado de carga de tasas -->
+                <p id="rate-status" class="text-xs text-gray-500 text-center">Cargando tasas de cambio...</p>
             </div>
             
             <hr class="my-6 border-gray-200">
@@ -115,7 +115,6 @@
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <span class="text-gray-500 sm:text-sm">US$</span>
                         </div>
-                        <!-- CAMBIO: Aumentado padding izquierdo de pl-10 a pl-16 -->
                         <input type="text" id="usd-output"
                                class="w-full pl-16 pr-4 py-3 rounded-lg bg-gray-100 border-gray-200 text-gray-900 text-2xl font-bold"
                                readonly placeholder="0.00">
@@ -131,7 +130,6 @@
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <span class="text-gray-500 sm:text-sm">ARS$</span>
                         </div>
-                        <!-- CAMBIO: Aumentado padding izquierdo de pl-10 a pl-16 -->
                         <input type="text" id="ars-output"
                                class="w-full pl-16 pr-4 py-3 rounded-lg bg-gray-100 border-gray-200 text-gray-900 text-2xl font-bold"
                                readonly placeholder="0.00">
@@ -161,7 +159,7 @@
                 
                 <p id="ocr-status" class="text-center text-gray-600 my-3">Centre el precio en la caja...</p>
 
-                <!-- CAMBIO: Contenedor para mostrar los resultados del OCR -->
+                <!-- Contenedor para mostrar los resultados del OCR -->
                 <div id="ocr-results-container" class="mt-4 space-y-2 max-h-32 overflow-y-auto">
                     <!-- Los botones con los números detectados aparecerán aquí -->
                 </div>
@@ -186,6 +184,7 @@
         const arsOutput = document.getElementById('ars-output');
         const usdToClpRateInput = document.getElementById('usd-to-clp-rate');
         const usdToArsRateInput = document.getElementById('usd-to-ars-rate');
+        const rateStatus = document.getElementById('rate-status'); // CAMBIO: Añadido
 
         // --- Elementos para OCR ---
         const cameraButton = document.getElementById('camera-button');
@@ -197,7 +196,6 @@
         const ocrStatus = document.getElementById('ocr-status');
         const ocrInitStatus = document.getElementById('ocr-init-status');
         const reticle = document.getElementById('reticle');
-        // CAMBIO: Contenedor de resultados
         const ocrResultsContainer = document.getElementById('ocr-results-container'); 
 
         let stream = null;
@@ -222,6 +220,42 @@
             usdOutput.value = usdValue.toFixed(2);
             arsOutput.value = arsValue.toFixed(2);
         }
+
+        // --- CAMBIO: Nueva función para Cargar Tasas de Cambio ---
+        async function fetchExchangeRates() {
+            // Usamos exchangerate-api.com, una API gratuita y fiable
+            const apiUrl = 'https://api.exchangerate-api.com/v4/latest/USD';
+            
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`Error de red: ${response.status}`);
+                }
+                const data = await response.json();
+                
+                const clpRate = data.rates.CLP;
+                const arsRate = data.rates.ARS;
+
+                if (clpRate && arsRate) {
+                    usdToClpRateInput.value = clpRate.toFixed(2);
+                    usdToArsRateInput.value = arsRate.toFixed(2);
+                    rateStatus.textContent = `Tasas actualizadas. 1 USD ≈ ${clpRate.toFixed(0)} CLP / ${arsRate.toFixed(0)} ARS`;
+                    
+                    // Dispara una conversión si ya hay un valor en CLP
+                    clpInput.dispatchEvent(new Event('input'));
+                } else {
+                    throw new Error('Tasas CLP o ARS no encontradas en la respuesta.');
+                }
+
+            } catch (error) {
+                console.error('Error al obtener tasas de cambio:', error);
+                rateStatus.textContent = 'Error al cargar tasas. Ingrese valores manuales.';
+                // Borra los placeholders de "Cargando..."
+                usdToClpRateInput.placeholder = "Ej: 930";
+                usdToArsRateInput.placeholder = "Ej: 1100";
+            }
+        }
+
 
         // --- FUNCIONES PARA OCR ---
 
@@ -255,7 +289,7 @@
                 videoEl.srcObject = stream;
                 ocrModal.classList.remove('hidden');
                 ocrStatus.textContent = 'Centre el precio en la caja...';
-                ocrResultsContainer.innerHTML = ''; // CAMBIO: Limpiar resultados anteriores
+                ocrResultsContainer.innerHTML = '';
             } catch (err) {
                 console.error('Error al acceder a la cámara:', err);
                 ocrStatus.textContent = 'Error al acceder a la cámara.';
@@ -286,7 +320,7 @@
             context.putImageData(imageData, 0, 0);
         }
 
-        // CAMBIO: 5. Manejar el escaneo (ahora con lista de selección)
+        // 5. Manejar el escaneo (con lista de selección)
         async function handleScan() {
             if (!worker) {
                 console.error('El worker de Tesseract no está listo.');
@@ -320,7 +354,7 @@
                 // Reconocer el texto
                 const { data } = await worker.recognize(canvasEl);
                 
-                // CAMBIO: Procesar todas las palabras detectadas
+                // Procesar todas las palabras detectadas
                 const detectedNumbers = new Set();
                 data.words.forEach(word => {
                     const num = word.text.replace(/\D/g, ''); // Limpiar para quedarse solo con dígitos
@@ -363,7 +397,12 @@
         usdToClpRateInput.addEventListener('input', convertCurrency);
         usdToArsRateInput.addEventListener('input', convertCurrency);
 
-        document.addEventListener('DOMContentLoaded', initializeOCR);
+        // CAMBIO: Al cargar la página, inicializar OCR Y cargar tasas
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeOCR();
+            fetchExchangeRates();
+        });
+        
         cameraButton.addEventListener('click', startCamera);
         closeModalButton.addEventListener('click', stopCamera);
         scanButton.addEventListener('click', handleScan);
