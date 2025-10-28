@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversor de Precios Chile</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carga de Tesseract.js (para OCR) -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Ocultar las flechas en los inputs de tipo número */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-gray-50 to-blue-100 flex items-center justify-center min-h-screen p-4">
+
+    <!-- Contenedor Principal de la App -->
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-auto overflow-hidden">
+
+        <!-- Cabecera -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 sm:p-8 text-white">
+            <div class="text-center">
+                <h1 class="text-3xl font-bold">Conversor Manual</h1>
+                <p class="text-blue-100 mt-1">Precios de Chile 🇨🇱 a ARS 🇦🇷 y USD 🇺🇸</p>
+            </div>
+        </div>
+
+        <!-- Contenido principal -->
+        <main id="converter-main" class="p-6 sm:p-8">
+            
+            <!-- Inputs de Tasas de Cambio -->
+            <div class="space-y-4 mb-6">
+                <div>
+                    <label for="usd-to-clp-rate" class="block text-sm font-medium text-gray-700 mb-1">
+                        Valor del Dólar en Chile (1 USD a CLP)
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="text-gray-500 sm:text-sm">CLP$</span>
+                        </div>
+                        <!-- CAMBIO: Aumentado padding izquierdo de pl-12 a pl-14 -->
+                        <input type="number" id="usd-to-clp-rate"
+                               class="w-full pl-14 pr-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xl"
+                               placeholder="Ej: 930"
+                               inputmode="decimal">
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="usd-to-ars-rate" class="block text-sm font-medium text-gray-700 mb-1">
+                        Valor del Dólar en Argentina (1 USD a ARS)
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="text-gray-500 sm:text-sm">ARS$</span>
+                        </div>
+                        <!-- CAMBIO: Aumentado padding izquierdo de pl-12 a pl-14 -->
+                        <input type="number" id="usd-to-ars-rate"
+                               class="w-full pl-14 pr-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xl"
+                               placeholder="Ej: 1100"
+                               inputmode="decimal">
+                    </div>
+                </div>
+            </div>
+            
+            <hr class="my-6 border-gray-200">
+
+            <!-- Input de Precio Chileno (CLP) con botón de cámara -->
+            <div>
+                <label for="clp-input" class="block text-sm font-medium text-gray-700 mb-1">
+                    Precio en Pesos Chilenos (CLP)
+                </label>
+                <div class="flex items-center space-x-2">
+                    <div class="relative flex-grow">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="text-gray-500 sm:text-sm">$</span>
+                        </div>
+                        <input type="number" id="clp-input"
+                               class="w-full pl-8 pr-4 py-3 rounded-lg border-2 border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xl"
+                               placeholder="Ej: 5990"
+                               inputmode="decimal">
+                    </div>
+                    <button id="camera-button" class="p-3 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-600 transition duration-150 disabled:opacity-50" disabled>
+                        <!-- Icono SVG de cámara -->
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </button>
+                </div>
+                <p id="ocr-init-status" class="text-xs text-gray-500 mt-1 text-center">Inicializando OCR...</p>
+            </div>
+
+            <!-- Resultados -->
+            <div class="space-y-4 mt-6">
+                <!-- Resultado Dólar (USD) -->
+                <div>
+                    <label for="usd-output" class="block text-sm font-medium text-gray-600">
+                        Equivalente en Dólares (USD)
+                    </label>
+                    <div class="relative mt-1">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="text-gray-500 sm:text-sm">US$</span>
+                        </div>
+                        <!-- CAMBIO: Aumentado padding izquierdo de pl-10 a pl-16 -->
+                        <input type="text" id="usd-output"
+                               class="w-full pl-16 pr-4 py-3 rounded-lg bg-gray-100 border-gray-200 text-gray-900 text-2xl font-bold"
+                               readonly placeholder="0.00">
+                    </div>
+                </div>
+
+                <!-- Resultado Peso Argentino (ARS) -->
+                <div>
+                    <label for="ars-output" class="block text-sm font-medium text-gray-600">
+                        Equivalente en Pesos Argentinos (ARS)
+                    </label>
+                    <div class="relative mt-1">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="text-gray-500 sm:text-sm">ARS$</span>
+                        </div>
+                        <!-- CAMBIO: Aumentado padding izquierdo de pl-10 a pl-16 -->
+                        <input type="text" id="ars-output"
+                               class="w-full pl-16 pr-4 py-3 rounded-lg bg-gray-100 border-gray-200 text-gray-900 text-2xl font-bold"
+                               readonly placeholder="0.00">
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal para el escáner OCR -->
+    <div id="ocr-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+            <h3 class="text-xl font-semibold p-4 border-b">Escanear Precio</h3>
+            <div class="p-4 relative">
+                <!-- El video de la cámara se mostrará aquí -->
+                <video id="video-feed" class="w-full rounded-lg bg-gray-900" playsinline autoplay muted></video>
+                
+                <!-- Retículo de enfoque -->
+                <div id="reticle" class="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-1/3 mx-4 pointer-events-none">
+                    <div class="absolute inset-0 bg-black opacity-30"></div>
+                    <div class="absolute inset-4 border-4 border-white opacity-75 rounded"></div>
+                    <div class="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-0.5 bg-red-500 opacity-75"></div>
+                </div>
+
+                <!-- Canvas oculto para tomar la "foto" -->
+                <canvas id="snapshot-canvas" class="hidden"></canvas>
+                
+                <p id="ocr-status" class="text-center text-gray-600 my-3">Centre el precio en la caja...</p>
+
+                <!-- CAMBIO: Contenedor para mostrar los resultados del OCR -->
+                <div id="ocr-results-container" class="mt-4 space-y-2 max-h-32 overflow-y-auto">
+                    <!-- Los botones con los números detectados aparecerán aquí -->
+                </div>
+
+                <div class="flex space-x-2 mt-4">
+                    <button id="scan-button" class="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50">
+                        Escanear Precio
+                    </button>
+                    <button id="close-modal-button" class="w-full py-3 bg-gray-300 text-gray-800 rounded-lg font-semibold hover:bg-gray-400 transition">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- Referencias a los elementos del DOM ---
+        const clpInput = document.getElementById('clp-input');
+        const usdOutput = document.getElementById('usd-output');
+        const arsOutput = document.getElementById('ars-output');
+        const usdToClpRateInput = document.getElementById('usd-to-clp-rate');
+        const usdToArsRateInput = document.getElementById('usd-to-ars-rate');
+
+        // --- Elementos para OCR ---
+        const cameraButton = document.getElementById('camera-button');
+        const ocrModal = document.getElementById('ocr-modal');
+        const videoEl = document.getElementById('video-feed');
+        const canvasEl = document.getElementById('snapshot-canvas');
+        const scanButton = document.getElementById('scan-button');
+        const closeModalButton = document.getElementById('close-modal-button');
+        const ocrStatus = document.getElementById('ocr-status');
+        const ocrInitStatus = document.getElementById('ocr-init-status');
+        const reticle = document.getElementById('reticle');
+        // CAMBIO: Contenedor de resultados
+        const ocrResultsContainer = document.getElementById('ocr-results-container'); 
+
+        let stream = null;
+        let worker = null;
+
+        // --- Función de Conversión ---
+        function convertCurrency() {
+            const clpValue = parseFloat(clpInput.value);
+            const usdToClpRate = parseFloat(usdToClpRateInput.value);
+            const usdToArsRate = parseFloat(usdToArsRateInput.value);
+
+            if (isNaN(clpValue) || isNaN(usdToClpRate) || isNaN(usdToArsRate) || 
+                clpValue <= 0 || usdToClpRate <= 0 || usdToArsRate <= 0) {
+                usdOutput.value = '';
+                arsOutput.value = '';
+                return;
+            }
+
+            const usdValue = clpValue / usdToClpRate;
+            const arsValue = usdValue * usdToArsRate;
+
+            usdOutput.value = usdValue.toFixed(2);
+            arsOutput.value = arsValue.toFixed(2);
+        }
+
+        // --- FUNCIONES PARA OCR ---
+
+        // 1. Inicializar Tesseract.js
+        async function initializeOCR() {
+            try {
+                worker = await Tesseract.createWorker('eng', 1, {
+                    logger: m => console.log(m.status),
+                });
+                await worker.setParameters({
+                    tessedit_char_whitelist: '0123456789.,$',
+                });
+                console.log('Tesseract worker inicializado.');
+                cameraButton.disabled = false;
+                ocrInitStatus.textContent = 'OCR listo.';
+            } catch (err) {
+                console.error('Error inicializando Tesseract:', err);
+                ocrInitStatus.textContent = 'Error al cargar OCR.';
+            }
+        }
+
+        // 2. Iniciar la cámara
+        async function startCamera() {
+            try {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }
+                });
+                videoEl.srcObject = stream;
+                ocrModal.classList.remove('hidden');
+                ocrStatus.textContent = 'Centre el precio en la caja...';
+                ocrResultsContainer.innerHTML = ''; // CAMBIO: Limpiar resultados anteriores
+            } catch (err) {
+                console.error('Error al acceder a la cámara:', err);
+                ocrStatus.textContent = 'Error al acceder a la cámara.';
+                setTimeout(() => ocrModal.classList.add('hidden'), 1500);
+            }
+        }
+
+        // 3. Detener la cámara
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            videoEl.srcObject = null;
+            ocrModal.classList.add('hidden');
+        }
+
+        // 4. Función para aplicar filtro de escala de grises
+        function applyGrayscale(context, width, height) {
+            const imageData = context.getImageData(0, 0, width, height);
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                data[i] = avg;     // Red
+                data[i + 1] = avg; // Green
+                data[i + 2] = avg; // Blue
+            }
+            context.putImageData(imageData, 0, 0);
+        }
+
+        // CAMBIO: 5. Manejar el escaneo (ahora con lista de selección)
+        async function handleScan() {
+            if (!worker) {
+                console.error('El worker de Tesseract no está listo.');
+                return;
+            }
+
+            scanButton.disabled = true;
+            ocrStatus.textContent = 'Escaneando... (esto puede tardar)';
+            ocrResultsContainer.innerHTML = ''; // Limpiar resultados
+
+            try {
+                // --- Lógica de Recorte ---
+                const videoRect = videoEl.getBoundingClientRect();
+                const reticleRect = reticle.getBoundingClientRect();
+                const sx_ratio = (reticleRect.left - videoRect.left) / videoRect.width;
+                const sy_ratio = (reticleRect.top - videoRect.top) / videoRect.height;
+                const sWidth_ratio = reticleRect.width / videoRect.width;
+                const sHeight_ratio = reticleRect.height / videoRect.height;
+                const sx = videoEl.videoWidth * sx_ratio;
+                const sy = videoEl.videoHeight * sy_ratio;
+                const sWidth = videoEl.videoWidth * sWidth_ratio;
+                const sHeight = videoEl.videoHeight * sHeight_ratio;
+                canvasEl.width = sWidth;
+                canvasEl.height = sHeight;
+                const ctx = canvasEl.getContext('2d', { willReadFrequently: true });
+                ctx.drawImage(videoEl, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
+                applyGrayscale(ctx, sWidth, sHeight);
+                // --- Fin de Lógica de Recorte y Filtro ---
+
+
+                // Reconocer el texto
+                const { data } = await worker.recognize(canvasEl);
+                
+                // CAMBIO: Procesar todas las palabras detectadas
+                const detectedNumbers = new Set();
+                data.words.forEach(word => {
+                    const num = word.text.replace(/\D/g, ''); // Limpiar para quedarse solo con dígitos
+                    if (num.length > 0) { // Si queda algún número
+                        detectedNumbers.add(num);
+                    }
+                });
+
+                if (detectedNumbers.size > 0) {
+                    ocrStatus.textContent = 'Seleccione el precio detectado:';
+                    // Crear un botón por cada número detectado
+                    detectedNumbers.forEach(num => {
+                        const btn = document.createElement('button');
+                        btn.textContent = num;
+                        btn.className = 'w-full p-3 bg-blue-100 text-blue-700 font-semibold rounded-lg hover:bg-blue-200 transition text-lg';
+                        
+                        // Acción al hacer clic en el botón
+                        btn.onclick = () => {
+                            clpInput.value = num; // Poner el número en el input
+                            clpInput.dispatchEvent(new Event('input')); // Disparar la conversión
+                            stopCamera(); // Cerrar el modal
+                        };
+                        ocrResultsContainer.appendChild(btn);
+                    });
+                } else {
+                    ocrStatus.textContent = 'No se detectaron números. Intente de nuevo.';
+                }
+
+            } catch (err) {
+                console.error('Error durante el OCR:', err);
+                ocrStatus.textContent = 'Error al escanear.';
+            } finally {
+                scanButton.disabled = false; // Re-habilitar el botón para reintentar
+            }
+        }
+
+        // --- Event Listeners ---
+        
+        clpInput.addEventListener('input', convertCurrency);
+        usdToClpRateInput.addEventListener('input', convertCurrency);
+        usdToArsRateInput.addEventListener('input', convertCurrency);
+
+        document.addEventListener('DOMContentLoaded', initializeOCR);
+        cameraButton.addEventListener('click', startCamera);
+        closeModalButton.addEventListener('click', stopCamera);
+        scanButton.addEventListener('click', handleScan);
+
+    </script>
+</body>
+</html>
